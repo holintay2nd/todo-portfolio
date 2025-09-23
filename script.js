@@ -291,10 +291,11 @@ class TodoApp {
             return false;
         }
 
-        // 중복 할일 체크
-        const isDuplicate = this.todos.some(todo => 
-            todo.text.toLowerCase() === text.toLowerCase() && !todo.completed
-        );
+        // 중복 할일 체크 (백엔드 API 호환성 고려)
+        const isDuplicate = this.todos.some(todo => {
+            const todoText = todo.text || todo.title || '';
+            return todoText.toLowerCase() === text.toLowerCase() && !todo.completed;
+        });
         
         if (isDuplicate) {
             this.showNotification('이미 같은 할일이 있습니다!', 'warning');
@@ -381,17 +382,18 @@ class TodoApp {
         }
     }
 
-    // 할일 데이터 객체 생성
+    // 할일 데이터 객체 생성 (백엔드 API 호환성 고려)
     createTodoData(text) {
         const now = new Date().toISOString();
         
         return {
-            text: text.trim(),
+            title: text.trim(),  // 백엔드 API에서 사용하는 필드
+            text: text.trim(),   // 기존 호환성을 위해 유지
             completed: false,
             createdAt: now,
             updatedAt: now,
-            priority: 'normal', // 우선순위 추가
-            category: 'general', // 카테고리 추가
+            priority: 'medium', // 백엔드 API에서 사용하는 우선순위 값
+            category: '', // 백엔드 API에서 사용하는 카테고리
             userId: 'anonymous', // 사용자 ID (향후 인증 기능 추가 시 사용)
             tags: [], // 태그 배열 (향후 확장용)
             dueDate: null, // 마감일 (향후 확장용)
@@ -580,7 +582,8 @@ class TodoApp {
             console.error('할일 수정 오류:', error);
             
             // 백엔드 오류 시 로컬 모드로 폴백
-            todo.text = text;
+            todo.title = text;  // 백엔드 API 호환성을 위해 title 사용
+            todo.text = text;   // 기존 호환성을 위해 text도 유지
             todo.updatedAt = new Date().toISOString();
             this.saveTodos();
             this.render();
