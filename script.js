@@ -1,44 +1,38 @@
-// 할일 관리 앱 JavaScript with Firebase
+// 할일 관리 앱 JavaScript with Backend API
 
 class TodoApp {
     constructor() {
         this.todos = [];
         this.editingId = null;
-        this.database = null;
-        this.todosRef = null;
-        this.unsubscribe = null;
+        this.apiBaseUrl = window.API_BASE_URL;
+        this.isLoading = false;
         
         this.initializeElements();
         this.bindEvents();
-        this.initializeFirebase();
+        this.initializeApp();
     }
 
-    // Firebase 초기화
-    async initializeFirebase() {
+    // 앱 초기화
+    async initializeApp() {
         try {
-            console.log('🚀 Firebase Realtime Database 초기화 시작');
-            this.updateConnectionStatus('connecting', 'Firebase에 연결 중...');
+            console.log('🚀 백엔드 API 초기화 시작');
+            this.updateConnectionStatus('connecting', '백엔드에 연결 중...');
             
-            // Firebase가 로드될 때까지 대기
-            await this.waitForFirebase();
+            // 백엔드 연결 테스트
+            await this.testBackendConnection();
             
-            console.log('🔗 Firebase Realtime Database 연결 설정 중');
-            this.database = window.firebaseDb;
-            this.todosRef = window.firebaseRef(this.database, 'todos');
+            // 할일 목록 로드
+            await this.loadTodos();
             
-            console.log('📡 실시간 리스너 설정 중');
-            // 실시간 리스너 설정
-            this.setupRealtimeListener();
-            
-            this.updateConnectionStatus('connected', 'Firebase에 연결됨');
-            this.showNotification('Firebase Realtime Database에 연결되었습니다!', 'success');
-            console.log('✅ Firebase 초기화 완료');
+            this.updateConnectionStatus('connected', '백엔드에 연결됨');
+            this.showNotification('백엔드 API에 연결되었습니다!', 'success');
+            console.log('✅ 백엔드 API 초기화 완료');
         } catch (error) {
-            console.error('❌ Firebase 초기화 오류:', error);
-            this.updateConnectionStatus('error', 'Firebase 연결 실패 - 로컬 모드');
-            this.showNotification('Firebase 연결에 실패했습니다. 로컬 모드로 실행됩니다.', 'warning');
+            console.error('❌ 백엔드 초기화 오류:', error);
+            this.updateConnectionStatus('error', '백엔드 연결 실패 - 로컬 모드');
+            this.showNotification('백엔드 연결에 실패했습니다. 로컬 모드로 실행됩니다.', 'warning');
             
-            // Firebase 연결 실패 시 로컬 스토리지 사용
+            // 백엔드 연결 실패 시 로컬 스토리지 사용
             console.log('💾 로컬 모드로 전환');
             this.todos = JSON.parse(localStorage.getItem('todos')) || [];
             this.render();
@@ -49,90 +43,62 @@ class TodoApp {
     // 연결 상태 업데이트
     updateConnectionStatus(status, message) {
         this.connectionStatus.className = `connection-status ${status}`;
-        this.connectionStatus.innerHTML = `<i class="fas fa-cloud"></i> ${message}`;
+        this.connectionStatus.innerHTML = `<i class="fas fa-server"></i> ${message}`;
     }
 
-    // Firebase 로드 대기
-    waitForFirebase() {
-        return new Promise((resolve, reject) => {
-            let attempts = 0;
-            const maxAttempts = 50; // 5초 대기
-            
-            console.log('⏳ Firebase Realtime Database 로드 대기 시작');
-            
-            const checkFirebase = () => {
-                attempts++;
-                console.log(`🔍 Firebase 로드 확인 시도 ${attempts}/${maxAttempts}:`, {
-                    firebaseDb: !!window.firebaseDb,
-                    firebaseApp: !!window.firebaseApp,
-                    firebaseRef: !!window.firebaseRef,
-                    firebasePush: !!window.firebasePush,
-                    firebaseSet: !!window.firebaseSet,
-                    firebaseOnValue: !!window.firebaseOnValue
-                });
-                
-                if (window.firebaseDb && window.firebaseApp && window.firebaseRef && 
-                    window.firebasePush && window.firebaseSet && window.firebaseOnValue) {
-                    console.log('✅ Firebase Realtime Database 로드 완료');
-                    resolve();
-                } else if (attempts >= maxAttempts) {
-                    console.error('❌ Firebase 로드 시간 초과');
-                    reject(new Error('Firebase 로드 시간 초과'));
-                } else {
-                    setTimeout(checkFirebase, 100);
-                }
-            };
-            
-            checkFirebase();
-        });
-    }
-
-    // 실시간 리스너 설정
-    setupRealtimeListener() {
+    // 백엔드 연결 테스트
+    async testBackendConnection() {
         try {
-            console.log('📡 Firebase Realtime Database 리스너 설정 시작');
-            
-            // 생성일 기준으로 정렬된 쿼리 생성
-            const todosQuery = window.firebaseQuery(this.todosRef, window.firebaseOrderByChild('createdAt'));
-            
-            this.unsubscribe = window.firebaseOnValue(todosQuery, (snapshot) => {
-                console.log('📊 Firebase Realtime Database 데이터 수신:', {
-                    exists: snapshot.exists(),
-                    hasChildren: snapshot.hasChildren(),
-                    timestamp: new Date().toISOString()
-                });
-                
-                // 연결 상태 업데이트
-                this.updateConnectionStatus('connected', 'Firebase에 연결됨');
-                
-                this.todos = [];
-                if (snapshot.exists()) {
-                    const data = snapshot.val();
-                    Object.keys(data).forEach(key => {
-                        const todo = { id: key, ...data[key] };
-                        this.todos.push(todo);
-                    });
-                    
-                    // 생성일 기준으로 내림차순 정렬 (최신이 먼저)
-                    this.todos.sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
+            const response = await fetch(`${this.apiBaseUrl}/stats/overview`, {
+                method: 'GET',
+                headers: {
+                    'Content-Type': 'application/json'
                 }
-                
-                this.render();
-                this.updateStats();
-                
-                console.log(`✅ Firebase Realtime Database에서 ${this.todos.length}개의 할일을 가져왔습니다.`);
-            }, (error) => {
-                console.error('❌ Firebase Realtime Database 리스너 오류:', error);
-                this.updateConnectionStatus('error', '데이터 동기화 오류');
-                this.showNotification('데이터 동기화에 문제가 발생했습니다.', 'error');
             });
             
-            console.log('✅ Firebase Realtime Database 리스너 설정 완료');
+            if (!response.ok) {
+                throw new Error(`HTTP error! status: ${response.status}`);
+            }
+            
+            const result = await response.json();
+            console.log('✅ 백엔드 연결 성공:', result);
+            return result;
         } catch (error) {
-            console.error('❌ Firebase Realtime Database 리스너 설정 실패:', error);
-            this.updateConnectionStatus('error', '리스너 설정 실패');
+            console.error('❌ 백엔드 연결 실패:', error);
+            throw error;
         }
     }
+
+    // 할일 목록 로드
+    async loadTodos() {
+        try {
+            const response = await fetch(this.apiBaseUrl, {
+                method: 'GET',
+                headers: {
+                    'Content-Type': 'application/json'
+                }
+            });
+            
+            if (!response.ok) {
+                throw new Error(`HTTP error! status: ${response.status}`);
+            }
+            
+            const result = await response.json();
+            
+            if (result.success) {
+                this.todos = result.data;
+                this.render();
+                this.updateStats();
+                console.log('✅ 할일 목록 로드 완료:', this.todos.length);
+            } else {
+                throw new Error(result.message || '할일 목록을 불러올 수 없습니다.');
+            }
+        } catch (error) {
+            console.error('❌ 할일 목록 로드 실패:', error);
+            throw error;
+        }
+    }
+
 
     initializeElements() {
         // DOM 요소들 가져오기
@@ -246,18 +212,21 @@ class TodoApp {
         console.log('⏳ 로딩 상태 시작');
 
         try {
-            // Firebase를 통한 Create 작업 실행
-            console.log('🔥 Firebase Create 작업 시작');
-            const result = await this.createTodoInFirebase(text);
+            // 백엔드 API를 통한 Create 작업 실행
+            console.log('🔥 백엔드 API Create 작업 시작');
+            const result = await this.createTodoInBackend(text);
             console.log('📊 Create 결과:', result);
             
             if (result.success) {
                 // 입력 폼 숨기기
                 this.hideInputForm();
                 
+                // 할일 목록 새로고침
+                await this.loadTodos();
+                
                 // 성공 메시지 표시
-                const successMessage = result.method === 'firebase' 
-                    ? `할일이 Firebase에 성공적으로 생성되었습니다! (${result.responseTime}ms)`
+                const successMessage = result.method === 'backend-api' 
+                    ? `할일이 백엔드에 성공적으로 생성되었습니다! (${result.responseTime}ms)`
                     : '할일이 로컬에 생성되었습니다!';
                 
                 this.showNotification(successMessage, 'success');
@@ -336,97 +305,69 @@ class TodoApp {
         return true;
     }
 
-    // Firebase Realtime Database를 통한 할일 생성 (Create 기능)
-    async createTodoInFirebase(text) {
+    // 백엔드 API를 통한 할일 생성 (Create 기능)
+    async createTodoInBackend(text) {
         try {
             // 할일 데이터 객체 생성
-            const todoData = this.createTodoData(text);
+            const todoData = {
+                title: text.trim(),
+                description: '',
+                priority: 'medium',
+                category: '',
+                dueDate: null,
+                tags: []
+            };
             
-            // Firebase 연결 상태 확인
-            console.log('🔍 Firebase Realtime Database 연결 상태 확인:', {
-                database: !!this.database,
-                todosRef: !!this.todosRef,
-                firebaseAvailable: !!window.firebaseDb,
-                firebaseApp: !!window.firebaseApp,
-                firebasePush: !!window.firebasePush,
+            console.log('🔥 백엔드 API Create 시작:', {
+                url: this.apiBaseUrl,
+                data: todoData,
                 timestamp: new Date().toISOString()
             });
             
-            if (this.database && this.todosRef) {
-                // Firebase Realtime Database에 데이터 생성
-                console.log('🔥 Firebase Realtime Database Create 시작:', {
-                    path: 'todos',
-                    data: todoData,
+            const startTime = Date.now();
+            
+            const response = await fetch(this.apiBaseUrl, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify(todoData)
+            });
+            
+            const endTime = Date.now();
+            
+            if (!response.ok) {
+                const errorData = await response.json();
+                throw new Error(errorData.message || `HTTP error! status: ${response.status}`);
+            }
+            
+            const result = await response.json();
+            
+            if (result.success) {
+                console.log('✅ 백엔드 API Create 성공:', {
+                    id: result.data._id,
+                    data: result.data,
+                    responseTime: `${endTime - startTime}ms`,
                     timestamp: new Date().toISOString()
                 });
                 
-                const startTime = Date.now();
-                
-                // Firebase Realtime Database 연결 테스트
-                try {
-                    // push()를 사용하여 새로운 자동 생성 키로 데이터 추가
-                    const newTodoRef = window.firebasePush(this.todosRef, todoData);
-                    const endTime = Date.now();
-                    
-                    console.log('✅ Firebase Realtime Database Create 성공:', {
-                        key: newTodoRef.key,
-                        data: todoData,
-                        responseTime: `${endTime - startTime}ms`,
-                        timestamp: new Date().toISOString()
-                    });
-                    
-                    // 성공 알림 업데이트
-                    this.updateConnectionStatus('connected', 'Firebase에 연결됨');
-                    
-                    return {
-                        success: true,
-                        id: newTodoRef.key,
-                        data: todoData,
-                        method: 'firebase-realtime',
-                        responseTime: endTime - startTime
-                    };
-                } catch (firebaseError) {
-                    console.error('❌ Firebase Realtime Database API 호출 실패:', {
-                        error: firebaseError.message,
-                        code: firebaseError.code,
-                        stack: firebaseError.stack
-                    });
-                    
-                    // Firebase 오류 시 로컬 모드로 폴백
-                    throw new Error(`Firebase Realtime Database 오류: ${firebaseError.message}`);
-                }
-            } else {
-                // Firebase 연결 실패 시 로컬 스토리지에 생성
-                console.log('💾 로컬 스토리지에 할일 생성:', {
-                    data: todoData,
-                    reason: 'Firebase Realtime Database 연결 없음',
-                    database: !!this.database,
-                    todosRef: !!this.todosRef,
-                    timestamp: new Date().toISOString()
-                });
-                
-                todoData.id = Date.now();
-                this.todos.unshift(todoData);
-                this.saveTodos();
-                this.render();
-                this.updateStats();
-                
-                // 오프라인 상태 알림
-                this.updateConnectionStatus('offline', '오프라인 모드 - 로컬 저장');
+                // 성공 알림 업데이트
+                this.updateConnectionStatus('connected', '백엔드에 연결됨');
                 
                 return {
                     success: true,
-                    id: todoData.id,
-                    data: todoData,
-                    method: 'local'
+                    id: result.data._id,
+                    data: result.data,
+                    method: 'backend-api',
+                    responseTime: endTime - startTime
                 };
+            } else {
+                throw new Error(result.message || '할일 생성에 실패했습니다.');
             }
         } catch (error) {
-            console.error('❌ Firebase Realtime Database Create 실패:', {
+            console.error('❌ 백엔드 API Create 실패:', {
                 error: error.message,
-                code: error.code,
                 stack: error.stack,
-                data: todoData,
                 timestamp: new Date().toISOString()
             });
             
@@ -435,8 +376,7 @@ class TodoApp {
             
             return {
                 success: false,
-                error: error.message,
-                code: error.code
+                error: error.message
             };
         }
     }
@@ -522,42 +462,58 @@ class TodoApp {
 
     // 할일 완료 상태 토글
     async toggleTodo(id) {
-        const todo = this.todos.find(todo => todo.id === id);
+        const todo = this.todos.find(todo => todo._id === id || todo.id === id);
         if (!todo) return;
 
-        const newCompleted = !todo.completed;
+        const todoId = todo._id || todo.id;
 
         try {
-            if (this.database && this.todosRef) {
-                // Firebase Realtime Database에서 업데이트
-                const todoRef = window.firebaseRef(this.database, `todos/${id}`);
-                await window.firebaseUpdate(todoRef, {
-                    completed: newCompleted,
-                    updatedAt: new Date().toISOString()
-                });
-            } else {
-                // 로컬 스토리지에서 업데이트
-                todo.completed = newCompleted;
-                todo.updatedAt = new Date().toISOString();
-                this.saveTodos();
-                this.render();
-                this.updateStats();
+            // 백엔드 API에 토글 요청
+            const response = await fetch(`${this.apiBaseUrl}/${todoId}/toggle`, {
+                method: 'PATCH',
+                headers: {
+                    'Content-Type': 'application/json'
+                }
+            });
+            
+            if (!response.ok) {
+                const errorData = await response.json();
+                throw new Error(errorData.message || `HTTP error! status: ${response.status}`);
             }
             
-            const message = newCompleted ? '할일을 완료했습니다!' : '할일을 다시 진행중으로 변경했습니다!';
-            this.showNotification(message, 'info');
+            const result = await response.json();
+            
+            if (result.success) {
+                // 할일 목록 새로고침
+                await this.loadTodos();
+                
+                const message = result.data.completed ? '할일을 완료했습니다!' : '할일을 다시 진행중으로 변경했습니다!';
+                this.showNotification(message, 'info');
+            } else {
+                throw new Error(result.message || '할일 상태 변경에 실패했습니다.');
+            }
         } catch (error) {
             console.error('할일 상태 변경 오류:', error);
-            this.showNotification('상태 변경에 실패했습니다.', 'error');
+            
+            // 백엔드 오류 시 로컬 모드로 폴백
+            todo.completed = !todo.completed;
+            todo.updatedAt = new Date().toISOString();
+            this.saveTodos();
+            this.render();
+            this.updateStats();
+            
+            this.updateConnectionStatus('offline', '오프라인 모드 - 로컬 저장');
+            const message = todo.completed ? '할일을 완료했습니다! (로컬 저장)' : '할일을 다시 진행중으로 변경했습니다! (로컬 저장)';
+            this.showNotification(message, 'warning');
         }
     }
 
     // 할일 수정 모달 열기
     editTodo(id) {
-        const todo = this.todos.find(todo => todo.id === id);
+        const todo = this.todos.find(todo => todo._id === id || todo.id === id);
         if (todo) {
             this.editingId = id;
-            this.editInput.value = todo.text;
+            this.editInput.value = todo.title || todo.text;
             this.editModal.style.display = 'block';
             
             // 모달 제목에 할일 정보 표시
@@ -572,7 +528,7 @@ class TodoApp {
             
             console.log('📝 할일 수정 모달 열기:', {
                 id: id,
-                text: todo.text,
+                text: todo.title || todo.text,
                 createdAt: todo.createdAt,
                 completed: todo.completed
             });
@@ -587,30 +543,51 @@ class TodoApp {
             return;
         }
 
-        const todo = this.todos.find(todo => todo.id === this.editingId);
+        const todo = this.todos.find(todo => todo._id === this.editingId || todo.id === this.editingId);
         if (!todo) return;
 
+        const todoId = todo._id || todo.id;
+
         try {
-            if (this.database && this.todosRef) {
-                // Firebase Realtime Database에서 업데이트
-                const todoRef = window.firebaseRef(this.database, `todos/${this.editingId}`);
-                await window.firebaseUpdate(todoRef, {
-                    text: text,
-                    updatedAt: new Date().toISOString()
-                });
-            } else {
-                // 로컬 스토리지에서 업데이트
-                todo.text = text;
-                todo.updatedAt = new Date().toISOString();
-                this.saveTodos();
-                this.render();
+            // 백엔드 API에 수정 요청
+            const response = await fetch(`${this.apiBaseUrl}/${todoId}`, {
+                method: 'PUT',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({
+                    title: text
+                })
+            });
+            
+            if (!response.ok) {
+                const errorData = await response.json();
+                throw new Error(errorData.message || `HTTP error! status: ${response.status}`);
             }
             
-            this.closeEditModal();
-            this.showNotification('할일이 수정되었습니다!', 'success');
+            const result = await response.json();
+            
+            if (result.success) {
+                // 할일 목록 새로고침
+                await this.loadTodos();
+                
+                this.closeEditModal();
+                this.showNotification('할일이 수정되었습니다!', 'success');
+            } else {
+                throw new Error(result.message || '할일 수정에 실패했습니다.');
+            }
         } catch (error) {
             console.error('할일 수정 오류:', error);
-            this.showNotification('할일 수정에 실패했습니다.', 'error');
+            
+            // 백엔드 오류 시 로컬 모드로 폴백
+            todo.text = text;
+            todo.updatedAt = new Date().toISOString();
+            this.saveTodos();
+            this.render();
+            
+            this.updateConnectionStatus('offline', '오프라인 모드 - 로컬 저장');
+            this.closeEditModal();
+            this.showNotification('할일이 수정되었습니다! (로컬 저장)', 'warning');
         }
     }
 
@@ -623,11 +600,14 @@ class TodoApp {
 
     // 할일 삭제
     async deleteTodo(id) {
-        const todo = this.todos.find(todo => todo.id === id);
+        const todo = this.todos.find(todo => todo._id === id || todo.id === id);
         if (!todo) return;
 
+        const todoId = todo._id || todo.id;
+        const todoText = todo.title || todo.text;
+
         // 더 상세한 삭제 확인
-        const confirmMessage = `정말로 이 할일을 삭제하시겠습니까?\n\n"${todo.text}"\n\n삭제된 할일은 복구할 수 없습니다.`;
+        const confirmMessage = `정말로 이 할일을 삭제하시겠습니까?\n\n"${todoText}"\n\n삭제된 할일은 복구할 수 없습니다.`;
         
         if (!confirm(confirmMessage)) {
             console.log('❌ 할일 삭제 취소됨:', id);
@@ -635,31 +615,49 @@ class TodoApp {
         }
 
         console.log('🗑️ 할일 삭제 시작:', {
-            id: id,
-            text: todo.text,
+            id: todoId,
+            text: todoText,
             completed: todo.completed,
             createdAt: todo.createdAt
         });
 
         try {
-            if (this.database && this.todosRef) {
-                // Firebase Realtime Database에서 삭제
-                const todoRef = window.firebaseRef(this.database, `todos/${id}`);
-                await window.firebaseRemove(todoRef);
-                console.log('✅ Firebase에서 할일 삭제 완료');
-            } else {
-                // 로컬 스토리지에서 삭제
-                this.todos = this.todos.filter(todo => todo.id !== id);
-                this.saveTodos();
-                this.render();
-                this.updateStats();
-                console.log('✅ 로컬에서 할일 삭제 완료');
+            // 백엔드 API에 삭제 요청
+            const response = await fetch(`${this.apiBaseUrl}/${todoId}`, {
+                method: 'DELETE',
+                headers: {
+                    'Content-Type': 'application/json'
+                }
+            });
+            
+            if (!response.ok) {
+                const errorData = await response.json();
+                throw new Error(errorData.message || `HTTP error! status: ${response.status}`);
             }
             
-            this.showNotification(`"${todo.text}" 할일이 삭제되었습니다!`, 'info');
+            const result = await response.json();
+            
+            if (result.success) {
+                // 할일 목록 새로고침
+                await this.loadTodos();
+                
+                console.log('✅ 백엔드에서 할일 삭제 완료');
+                this.showNotification(`"${todoText}" 할일이 삭제되었습니다!`, 'info');
+            } else {
+                throw new Error(result.message || '할일 삭제에 실패했습니다.');
+            }
         } catch (error) {
             console.error('❌ 할일 삭제 오류:', error);
-            this.showNotification('할일 삭제에 실패했습니다.', 'error');
+            
+            // 백엔드 오류 시 로컬 모드로 폴백
+            this.todos = this.todos.filter(todo => (todo._id || todo.id) !== todoId);
+            this.saveTodos();
+            this.render();
+            this.updateStats();
+            
+            this.updateConnectionStatus('offline', '오프라인 모드 - 로컬 저장');
+            console.log('✅ 로컬에서 할일 삭제 완료');
+            this.showNotification(`"${todoText}" 할일이 삭제되었습니다! (로컬 저장)`, 'warning');
         }
     }
 
@@ -680,14 +678,17 @@ class TodoApp {
             this.todoList.style.display = 'block';
             this.emptyState.style.display = 'none';
             
-            this.todoList.innerHTML = this.todos.map(todo => `
-                <div class="todo-item ${todo.completed ? 'completed' : ''}" data-id="${todo.id}">
+            this.todoList.innerHTML = this.todos.map(todo => {
+                const todoId = todo._id || todo.id;
+                const todoText = todo.title || todo.text;
+                return `
+                <div class="todo-item ${todo.completed ? 'completed' : ''}" data-id="${todoId}">
                     <div class="todo-content">
                         <input type="checkbox" 
                                class="todo-checkbox" 
                                ${todo.completed ? 'checked' : ''} 
-                               onchange="todoApp.toggleTodo('${todo.id}')">
-                        <span class="todo-text">${this.escapeHtml(todo.text)}</span>
+                               onchange="todoApp.toggleTodo('${todoId}')">
+                        <span class="todo-text">${this.escapeHtml(todoText)}</span>
                         <div class="todo-meta">
                             <small class="todo-date">${this.formatDate(todo.createdAt)}</small>
                             ${todo.updatedAt && todo.updatedAt !== todo.createdAt ? 
@@ -695,17 +696,18 @@ class TodoApp {
                         </div>
                     </div>
                     <div class="todo-actions">
-                        <button class="btn btn-edit" onclick="todoApp.editTodo('${todo.id}')" title="수정">
+                        <button class="btn btn-edit" onclick="todoApp.editTodo('${todoId}')" title="수정">
                             <i class="fas fa-edit"></i>
                             <span class="btn-text">수정</span>
                         </button>
-                        <button class="btn btn-delete" onclick="todoApp.deleteTodo('${todo.id}')" title="삭제">
+                        <button class="btn btn-delete" onclick="todoApp.deleteTodo('${todoId}')" title="삭제">
                             <i class="fas fa-trash"></i>
                             <span class="btn-text">삭제</span>
                         </button>
                     </div>
                 </div>
-            `).join('');
+            `;
+            }).join('');
         }
     }
 
@@ -823,11 +825,8 @@ class TodoApp {
 
     // 앱 정리 (리소스 해제)
     cleanup() {
-        if (this.unsubscribe) {
-            // Firebase Realtime Database 리스너 해제
-            window.firebaseOff(this.todosRef, 'value', this.unsubscribe);
-            this.unsubscribe = null;
-        }
+        // 백엔드 API는 별도의 정리가 필요하지 않음
+        console.log('🧹 앱 정리 완료');
     }
 
     // 모든 할일 완료
@@ -836,30 +835,55 @@ class TodoApp {
         const newCompleted = hasIncomplete;
 
         try {
-            if (this.db) {
-                // Firebase에서 모든 할일 업데이트
-                const updatePromises = this.todos.map(todo => {
-                    const todoRef = window.firebaseDoc(this.db, 'todos', todo.id);
-                    return window.firebaseUpdateDoc(todoRef, {
-                        completed: newCompleted
-                    });
-                });
-                await Promise.all(updatePromises);
-            } else {
-                // 로컬 스토리지에서 업데이트
-                this.todos.forEach(todo => {
-                    todo.completed = newCompleted;
-                });
-                this.saveTodos();
-                this.render();
-                this.updateStats();
+            // 백엔드 API에 모든 할일 업데이트 요청
+            const incompleteTodos = this.todos.filter(todo => !todo.completed);
+            
+            if (incompleteTodos.length === 0) {
+                this.showNotification('완료할 할일이 없습니다.', 'info');
+                return;
             }
+
+            // 각 할일에 대해 개별적으로 업데이트 요청
+            const updatePromises = incompleteTodos.map(async (todo) => {
+                const todoId = todo._id || todo.id;
+                const response = await fetch(`${this.apiBaseUrl}/${todoId}`, {
+                    method: 'PUT',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        completed: newCompleted
+                    })
+                });
+                
+                if (!response.ok) {
+                    throw new Error(`HTTP error! status: ${response.status}`);
+                }
+                
+                return response.json();
+            });
+
+            await Promise.all(updatePromises);
+            
+            // 할일 목록 새로고침
+            await this.loadTodos();
             
             const message = newCompleted ? '모든 할일을 완료했습니다!' : '모든 할일을 다시 진행중으로 변경했습니다!';
             this.showNotification(message, 'info');
         } catch (error) {
             console.error('전체 할일 상태 변경 오류:', error);
-            this.showNotification('상태 변경에 실패했습니다.', 'error');
+            
+            // 백엔드 오류 시 로컬 모드로 폴백
+            this.todos.forEach(todo => {
+                todo.completed = newCompleted;
+            });
+            this.saveTodos();
+            this.render();
+            this.updateStats();
+            
+            this.updateConnectionStatus('offline', '오프라인 모드 - 로컬 저장');
+            const message = newCompleted ? '모든 할일을 완료했습니다! (로컬 저장)' : '모든 할일을 다시 진행중으로 변경했습니다! (로컬 저장)';
+            this.showNotification(message, 'warning');
         }
     }
 
@@ -876,25 +900,40 @@ class TodoApp {
         if (!confirm(`완료된 ${completedCount}개의 할일을 모두 삭제하시겠습니까?`)) return;
 
         try {
-            if (this.db) {
-                // Firebase에서 완료된 할일들 삭제
-                const deletePromises = completedTodos.map(todo => {
-                    const todoRef = window.firebaseDoc(this.db, 'todos', todo.id);
-                    return window.firebaseDeleteDoc(todoRef);
+            // 백엔드 API에 완료된 할일들 삭제 요청
+            const deletePromises = completedTodos.map(async (todo) => {
+                const todoId = todo._id || todo.id;
+                const response = await fetch(`${this.apiBaseUrl}/${todoId}`, {
+                    method: 'DELETE',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    }
                 });
-                await Promise.all(deletePromises);
-            } else {
-                // 로컬 스토리지에서 삭제
-                this.todos = this.todos.filter(todo => !todo.completed);
-                this.saveTodos();
-                this.render();
-                this.updateStats();
-            }
+                
+                if (!response.ok) {
+                    throw new Error(`HTTP error! status: ${response.status}`);
+                }
+                
+                return response.json();
+            });
+
+            await Promise.all(deletePromises);
+            
+            // 할일 목록 새로고침
+            await this.loadTodos();
             
             this.showNotification(`${completedCount}개의 완료된 할일이 삭제되었습니다!`, 'info');
         } catch (error) {
             console.error('완료된 할일 삭제 오류:', error);
-            this.showNotification('삭제에 실패했습니다.', 'error');
+            
+            // 백엔드 오류 시 로컬 모드로 폴백
+            this.todos = this.todos.filter(todo => !todo.completed);
+            this.saveTodos();
+            this.render();
+            this.updateStats();
+            
+            this.updateConnectionStatus('offline', '오프라인 모드 - 로컬 저장');
+            this.showNotification(`${completedCount}개의 완료된 할일이 삭제되었습니다! (로컬 저장)`, 'warning');
         }
     }
 }

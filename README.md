@@ -1,12 +1,12 @@
-# 📝 Firebase 할일 관리 앱
+# 📝 백엔드 API 할일 관리 앱
 
-Firebase Realtime Database를 활용한 실시간 할일 관리 웹 애플리케이션입니다.
+REST API 백엔드를 활용한 할일 관리 웹 애플리케이션입니다.
 
 ## ✨ 주요 기능
 
-### 🔥 Firebase 연동
-- **Firebase Realtime Database**: 실시간 데이터 동기화
-- **자동 동기화**: 여러 디바이스에서 동시 접근 시 실시간 업데이트
+### 🔥 백엔드 API 연동
+- **REST API**: HTTP 기반 데이터 통신
+- **실시간 동기화**: 백엔드 서버와 실시간 데이터 동기화
 - **오프라인 지원**: 네트워크 연결 실패 시 자동으로 로컬 모드 전환
 
 ### 📱 할일 관리
@@ -24,7 +24,7 @@ Firebase Realtime Database를 활용한 실시간 할일 관리 웹 애플리케
 ## 🚀 기술 스택
 
 - **Frontend**: HTML5, CSS3, JavaScript (ES6+)
-- **Backend**: Firebase Realtime Database
+- **Backend**: REST API (Node.js/Express + MongoDB)
 - **Styling**: CSS Grid, Flexbox, CSS Animations
 - **Icons**: Font Awesome
 
@@ -36,10 +36,10 @@ git clone https://github.com/holintay2nd/todo-portfolio.git
 cd todo-portfolio
 ```
 
-### 2. Firebase 설정
-1. [Firebase Console](https://console.firebase.google.com/)에서 새 프로젝트 생성
-2. Realtime Database 활성화
-3. `index.html`의 Firebase 설정 정보를 본인 프로젝트 정보로 변경
+### 2. 백엔드 서버 설정
+1. 백엔드 서버가 `localhost:5002`에서 실행 중인지 확인
+2. API 엔드포인트가 `/api/todos`로 설정되어 있는지 확인
+3. CORS 설정이 프론트엔드 도메인을 허용하는지 확인
 
 ### 3. 로컬 실행
 ```bash
@@ -52,33 +52,21 @@ npx http-server
 
 4. 브라우저에서 `http://localhost:8000` 접속
 
-## 🔧 Firebase 설정
+## 🔧 백엔드 API 설정
 
-### Realtime Database 보안 규칙
-```json
-{
-  "rules": {
-    "todos": {
-      ".read": true,
-      ".write": true
-    }
-  }
-}
-```
+### API 엔드포인트
+- **Base URL**: `http://localhost:5002/api/todos`
+- **할일 조회**: `GET /api/todos`
+- **할일 생성**: `POST /api/todos`
+- **할일 수정**: `PUT /api/todos/:id`
+- **할일 삭제**: `DELETE /api/todos/:id`
+- **할일 토글**: `PATCH /api/todos/:id/toggle`
 
-### Firebase 설정 정보
-`index.html`에서 다음 정보를 본인 프로젝트 정보로 변경:
+### 백엔드 서버 설정
+`index.html`에서 API URL을 변경하려면:
 
 ```javascript
-const firebaseConfig = {
-  apiKey: "your-api-key",
-  authDomain: "your-project.firebaseapp.com",
-  projectId: "your-project-id",
-  storageBucket: "your-project.appspot.com",
-  messagingSenderId: "your-sender-id",
-  appId: "your-app-id",
-  databaseURL: "https://your-project-default-rtdb.firebaseio.com/"
-};
+window.API_BASE_URL = 'http://your-backend-url:port/api/todos';
 ```
 
 ## 📱 사용법
@@ -109,12 +97,12 @@ const firebaseConfig = {
 ## 🌟 특징
 
 ### 실시간 동기화
-- Firebase Realtime Database를 통한 실시간 데이터 동기화
-- 여러 브라우저 탭에서 동시 작업 시 즉시 반영
+- REST API를 통한 백엔드 서버와 데이터 동기화
+- 작업 후 자동으로 최신 데이터 새로고침
 
 ### 오프라인 지원
 - 네트워크 연결이 끊어져도 로컬 스토리지에서 작업 가능
-- 연결 복구 시 자동으로 Firebase와 동기화
+- 연결 복구 시 자동으로 백엔드 서버와 동기화
 
 ### 반응형 디자인
 - 모바일, 태블릿, 데스크톱 모든 기기에서 최적화

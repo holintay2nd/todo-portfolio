@@ -7,40 +7,10 @@
     <link rel="stylesheet" href="style.css">
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
     
-    <!-- Firebase SDK -->
-    <script type="module">
-        // Import the functions you need from the SDKs you need
-        import { initializeApp } from "https://www.gstatic.com/firebasejs/12.2.1/firebase-app.js";
-        import { getDatabase, ref, push, set, update, remove, onValue, off, orderByChild, query, get } from "https://www.gstatic.com/firebasejs/12.2.1/firebase-database.js";
-
-        // Your web app's Firebase configuration
-        const firebaseConfig = {
-            apiKey: "AIzaSyBpb__YiBKGodi2v1mKRljGuovhwDWodJs",
-            authDomain: "reus-todo-backend.firebaseapp.com",
-            projectId: "reus-todo-backend",
-            storageBucket: "reus-todo-backend.firebasestorage.app",
-            messagingSenderId: "1009832626862",
-            appId: "1:1009832626862:web:bc42e2b4c436e7d3f0fb3f",
-            databaseURL: "https://reus-todo-backend-default-rtdb.firebaseio.com/"
-        };
-
-        // Initialize Firebase
-        const app = initializeApp(firebaseConfig);
-        const database = getDatabase(app);
-
-        // Firebase Realtime Database 함수들을 전역으로 사용할 수 있도록 설정
-        window.firebaseApp = app;
-        window.firebaseDb = database;
-        window.firebaseRef = ref;
-        window.firebasePush = push;
-        window.firebaseSet = set;
-        window.firebaseUpdate = update;
-        window.firebaseRemove = remove;
-        window.firebaseOnValue = onValue;
-        window.firebaseOff = off;
-        window.firebaseOrderByChild = orderByChild;
-        window.firebaseQuery = query;
-        window.firebaseGet = get;
+    <!-- Backend API Configuration -->
+    <script>
+        // Backend API 설정
+        window.API_BASE_URL = 'http://localhost:5002/api/todos';
     </script>
 </head>
 <body>
@@ -79,7 +49,7 @@
             </div>
             
             <div class="connection-status" id="connectionStatus">
-                <i class="fas fa-cloud"></i> Firebase에 연결 중...
+                <i class="fas fa-server"></i> 백엔드에 연결 중...
             </div>
         </div>
 
